@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<body>
+<input id="msg" placeholder="Ask something..." style="width:300px">
+<button onclick="send()">Send</button>
+<pre id="out"></pre>
+<script>
+async function send() {
+  const msg = document.getElementById('msg').value;
+  const res = await fetch('http://localhost:8000/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({session_id: 'test-1', message: msg})
+  });
+  const data = await res.json();
+  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+}
+</script>
+</body>
+</html>

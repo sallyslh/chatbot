@@ -1,0 +1,9 @@
+venv/
+.env
+__pycache__/
+*.pyc
+
+# generated index / embeddings and runtime DB (ignored anywhere in the tree)
+blnk.index
+blnk_meta.json
+*.db
