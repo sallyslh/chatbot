@@ -8,7 +8,10 @@ from app.normalize import normalize_query
 INDEX_PATH = "data/blnk.index"
 META_PATH = "data/blnk_meta.json"
 
-model = SentenceTransformer("BAAI/bge-m3")
+# Load from the local HuggingFace cache only. The model is already downloaded, so
+# there's no reason to contact huggingface.co at startup — that network check was
+# failing on SSL cert verification and crashing the whole server before it could boot.
+model = SentenceTransformer("BAAI/bge-m3", local_files_only=True)
 
 _index = faiss.read_index(INDEX_PATH)
 with open(META_PATH, "r", encoding="utf-8") as f:

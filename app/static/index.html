@@ -3,65 +3,408 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Chatbot</title>
+  <title>BLNK · Chat</title>
   <style>
-    :root { --bg:#0f172a; --panel:#1e293b; --user:#2563eb; --bot:#334155; --text:#e2e8f0; --muted:#94a3b8; }
+    :root {
+      --bg-0:#0a0e1c; --bg-1:#111730;
+      --panel:rgba(20,27,48,.72); --bot:#1b2340; --bot-border:#2b3660;
+      --text:#eaeefb; --muted:#93a1c6;
+      --accent:#6d5efc; --accent-2:#9b6bff;
+      --user-grad:linear-gradient(135deg,#6d5efc,#9b6bff);
+      --book-grad:linear-gradient(135deg,#18b26b,#12995c);
+      --radius:20px;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-           background:var(--bg); color:var(--text); height:100dvh; display:flex; flex-direction:column; }
-    header { padding:14px 18px; background:var(--panel); font-weight:600; border-bottom:1px solid #334155;
-             display:flex; justify-content:space-between; align-items:center; }
-    header small { color:var(--muted); font-weight:400; }
-    #log { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:12px; }
-    .msg { max-width:75%; padding:10px 14px; border-radius:14px; line-height:1.5; white-space:pre-wrap; word-wrap:break-word; }
-    .user { align-self:flex-end; background:var(--user); border-bottom-right-radius:4px; }
-    .bot  { align-self:flex-start; background:var(--bot); border-bottom-left-radius:4px; }
-    .meta { align-self:center; color:var(--muted); font-size:12px; }
+    html, body { height:100%; }
+    body {
+      margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      color:var(--text); height:100dvh; display:flex; flex-direction:column;
+      background:
+        radial-gradient(1100px 560px at 12% -10%, rgba(109,94,252,.20), transparent 60%),
+        radial-gradient(1000px 520px at 112% 8%, rgba(155,107,255,.16), transparent 55%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1));
+      background-attachment:fixed;
+    }
+
+    /* Header — glassy top bar with a brand mark and a live status dot */
+    header {
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      padding:12px 20px; background:var(--panel); backdrop-filter:blur(16px);
+      border-bottom:1px solid rgba(255,255,255,.07); position:sticky; top:0; z-index:5;
+    }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo {
+      width:40px; height:40px; border-radius:12px; display:grid; place-items:center;
+      font-weight:800; font-size:18px; color:#fff; background:var(--user-grad);
+      box-shadow:0 6px 18px rgba(109,94,252,.45);
+    }
+    .brand-name { font-weight:700; font-size:16px; letter-spacing:.2px; }
+    .brand-name .dot { color:var(--accent-2); }
+    .brand-status { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:2px; }
+    .status-dot {
+      width:8px; height:8px; border-radius:50%; background:#28d17c;
+      box-shadow:0 0 0 3px rgba(40,209,124,.18); animation:pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+    header small { color:var(--muted); font-weight:400; font-size:11px; opacity:.65; }
+
+    /* Message list — a centered, readable column on wide screens */
+    #log {
+      flex:1; overflow-y:auto; padding:22px 18px; display:flex; flex-direction:column; gap:14px;
+      width:100%; max-width:900px; margin:0 auto;
+    }
+    #log::-webkit-scrollbar { width:8px; }
+    #log::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); border-radius:8px; }
+    #log::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.2); }
+
+    .msg {
+      max-width:78%; padding:12px 16px; border-radius:var(--radius); line-height:1.55; font-size:15px;
+      white-space:pre-wrap; word-wrap:break-word; box-shadow:0 2px 12px rgba(0,0,0,.2);
+      animation:rise .28s cubic-bezier(.2,.8,.2,1) both;
+    }
+    @keyframes rise { from { opacity:0; transform:translateY(8px) scale(.98); } to { opacity:1; transform:none; } }
+    .user { align-self:flex-end; color:#fff; background:var(--user-grad); border-bottom-right-radius:6px; }
+    .bot  { align-self:flex-start; background:var(--bot); border:1px solid var(--bot-border); border-bottom-left-radius:6px; }
     /* auto-direction: Arabic renders RTL, English LTR */
     .msg:dir(rtl) { text-align:right; }
-    form { display:flex; gap:10px; padding:14px; background:var(--panel); border-top:1px solid #334155; }
-    #input { flex:1; padding:12px 14px; border-radius:10px; border:1px solid #475569;
-             background:#0b1220; color:var(--text); font-size:15px; }
-    #input:focus { outline:none; border-color:var(--user); }
-    button { padding:12px 20px; border:none; border-radius:10px; background:var(--user); color:#fff;
-             font-size:15px; font-weight:600; cursor:pointer; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-  </style>
+    .meta {
+      align-self:center; color:var(--muted); font-size:12.5px; padding:6px 14px; border-radius:999px;
+      background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+    }
+
+    /* Composer — glassy bottom bar with a focus-glow input */
+    form {
+      display:flex; gap:10px; padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+      background:var(--panel); backdrop-filter:blur(16px); border-top:1px solid rgba(255,255,255,.07);
+    }
+    .composer-inner { display:flex; gap:10px; width:100%; max-width:900px; margin:0 auto; }
+    #input {
+      flex:1; padding:13px 16px; border-radius:14px; border:1px solid rgba(255,255,255,.1);
+      background:rgba(6,10,22,.7); color:var(--text); font-size:15px;
+      transition:border-color .2s, box-shadow .2s;
+    }
+    #input::placeholder { color:var(--muted); }
+    #input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(109,94,252,.18); }
+    button {
+      padding:13px 22px; border:none; border-radius:14px; background:var(--user-grad); color:#fff;
+      font-size:15px; font-weight:600; cursor:pointer;
+      box-shadow:0 6px 18px rgba(109,94,252,.35); transition:transform .12s, opacity .2s, filter .2s;
+    }
+    button:hover { transform:translateY(-1px); filter:brightness(1.05); }
+    button:active { transform:translateY(0); }
+    button:disabled { opacity:.5; cursor:not-allowed; box-shadow:none; }
+
+    /* Pre-chat capture overlay — sits on top of the log+composer until submitted or skipped */
+    #precap-overlay {
+      position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+      padding:20px; background:rgba(6,10,22,.72); backdrop-filter:blur(6px);
+    }
+    #precap-card {
+      width:100%; max-width:380px; padding:26px 24px; border-radius:var(--radius);
+      background:var(--panel); border:1px solid rgba(255,255,255,.08); backdrop-filter:blur(16px);
+      box-shadow:0 12px 40px rgba(0,0,0,.4); display:flex; flex-direction:column; gap:12px;
+    }
+    #precap-card h3 { margin:0; font-size:17px; }
+    #precap-card p { margin:0; color:var(--muted); font-size:13px; }
+    #precap-card input {
+      padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.1);
+      background:rgba(6,10,22,.7); color:var(--text); font-size:14px;
+    }
+    #precap-card input::placeholder { color:var(--muted); }
+    #precap-card input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(109,94,252,.18); }
+    .precap-actions { display:flex; gap:10px; margin-top:4px; }
+    #precap-start {
+      flex:1; padding:12px 18px; border:none; border-radius:12px; background:var(--user-grad);
+      color:#fff; font-size:14px; font-weight:600; cursor:pointer;
+    }
+    #precap-skip {
+      padding:12px 16px; border:1px solid rgba(255,255,255,.12); border-radius:12px;
+      background:transparent; color:var(--muted); font-size:14px; cursor:pointer;
+    }
+    #precap-start:hover { filter:brightness(1.05); }
+    #precap-skip:hover { color:var(--text); border-color:rgba(255,255,255,.25); }
+
+    /* Typing indicator */
+    .typing { display:inline-flex; gap:5px; align-items:center; padding:4px 0; }
+    .typing span { width:8px; height:8px; border-radius:50%; background:var(--muted);
+                   animation: blink 1.4s infinite both; }
+    .typing span:nth-child(2) { animation-delay:.2s; }
+    .typing span:nth-child(3) { animation-delay:.4s; }
+    @keyframes blink { 0%,80%,100% { opacity:.2; } 40% { opacity:1; } }
+
+    /* Booking prompt shown as its OWN message, below the bot's text reply */
+    .book-msg { align-self:flex-start; max-width:78%; animation:rise .28s cubic-bezier(.2,.8,.2,1) both; }
+    .book-btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding:13px 20px; border:none; border-radius:16px; background:var(--book-grad); color:#fff;
+      font-size:14px; font-weight:700; cursor:pointer;
+      box-shadow:0 8px 20px rgba(24,178,107,.38); transition:transform .12s, filter .2s;
+    }
+    .book-btn:hover { transform:translateY(-1px); filter:brightness(1.06); }
+
+    @media (max-width:560px) {
+      .msg { max-width:88%; }
+      header { padding:10px 16px; }
+    }
+</style>
+  <!-- Calendly popup widget: lets the customer book inside an overlay without leaving the chat.
+       If this fails to load (blocked/offline), the button falls back to opening the link in a tab. -->
+  <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+  <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 </head>
 <body>
   <header>
-    <span>💬 Chatbot</span>
+    <div class="brand">
+      <div class="logo">B</div>
+      <div>
+        <div class="brand-name">BLNK<span class="dot">.</span></div>
+        <div class="brand-status"><span class="status-dot"></span> Online now</div>
+      </div>
+    </div>
     <small id="sid"></small>
   </header>
   <div id="log">
     <div class="meta">Ask me anything — بالعربي أو بالإنجليزي</div>
   </div>
   <form id="form" autocomplete="off">
-    <input id="input" placeholder="Type your message…" autofocus />
-    <button id="send" type="submit">Send</button>
+    <div class="composer-inner">
+      <input id="input" placeholder="Type your message…" />
+      <button id="send" type="submit">Send</button>
+    </div>
   </form>
+
+  <!-- Optional pre-chat capture (2026-07-21): two fields, both skippable — filling them in lets
+       the very first reply already be tailored (no mid-conversation "what's your field?" ask). -->
+  <div id="precap-overlay">
+    <div id="precap-card">
+      <h3>Tell us a bit about your business</h3>
+      <p>Totally optional — helps us tailor the chat from the start.</p>
+      <input id="precap-company" placeholder="Company name" autocomplete="off" autofocus />
+      <input id="precap-field" placeholder="Your industry / field" autocomplete="off" />
+      <div class="precap-actions">
+        <button id="precap-start" type="button">Start chatting</button>
+        <button id="precap-skip" type="button">Skip</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // one stable session id per browser tab session
     const sessionId = "web-" + Math.random().toString(36).slice(2, 10);
     document.getElementById("sid").textContent = sessionId;
 
+    // Pre-chat capture — filled in once, then sent alongside every /chat request (see the
+    // ChatRequest.company_name/industry fields in main.py; harmless to resend, merge_profile only
+    // ever sets each one once). Empty string means "skipped" — sent as null, not an empty value.
+    let precapCompany = "";
+    let precapIndustry = "";
+    const precapOverlay = document.getElementById("precap-overlay");
+    function closePrecap() {
+      precapCompany = document.getElementById("precap-company").value.trim();
+      precapIndustry = document.getElementById("precap-field").value.trim();
+      precapOverlay.style.display = "none";
+      input.focus();
+    }
+    document.getElementById("precap-start").addEventListener("click", closePrecap);
+    document.getElementById("precap-skip").addEventListener("click", () => {
+      // Skip ignores whatever was typed, even if the customer started filling it in then hit Skip.
+      precapOverlay.style.display = "none";
+      input.focus();
+    });
+    // Enter in either field submits, same as clicking "Start chatting" — this is a 2-field form,
+    // not a multi-line one, so Enter has no other reasonable meaning here.
+    for (const id of ["precap-company", "precap-field"]) {
+      document.getElementById(id).addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); closePrecap(); }
+      });
+    }
+
+    // Live channel for owner takeover: lets a human reply appear instantly without polling, and
+    // tells the widget when a team member joins/leaves the chat. Purely additive to the existing
+    // request/response /chat flow — a customer whose bot is never taken over never notices this.
+    function connectCustomerSocket() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${proto}//${location.host}/ws/customer/${sessionId}`);
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "new_message" && data.sender === "owner") {
+          // A real person's own words — shown as-is, not re-chunked through the bot's
+          // sentence-by-sentence typing animation. Deliberately no system note about a team
+          // member joining/leaving — the customer just sees messages arrive either way.
+          hideOwnerTyping();
+          addMsg(data.content, "bot");
+        } else if (data.type === "owner_typing") {
+          showOwnerTyping();
+        }
+      };
+      ws.onclose = () => setTimeout(connectCustomerSocket, 2000);  // reconnect on drop
+    }
+    connectCustomerSocket();
+
     const log = document.getElementById("log");
     const form = document.getElementById("form");
     const input = document.getElementById("input");
     const send = document.getElementById("send");
 
+    // Pick a base direction from the DOMINANT script, not the first character.
+    // "dir=auto" keys off the first strong character, so a mostly-Arabic reply that
+    // happens to start with an English word (e.g. "Consulting عندنا…") renders LTR and
+    // the start of the sentence gets visually misplaced. Counting letters is robust.
+    function dirFor(text) {
+      const arabic = (text.match(/[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/g) || []).length;
+      const latin = (text.match(/[A-Za-z]/g) || []).length;
+      return arabic > latin ? "rtl" : "ltr";
+    }
+
     function addMsg(text, cls) {
       const div = document.createElement("div");
       div.className = "msg " + cls;
-      div.setAttribute("dir", "auto"); // let the browser pick RTL/LTR from content
+      div.setAttribute("dir", dirFor(text)); // base direction from the dominant script
       div.textContent = text;
       log.appendChild(div);
       log.scrollTop = log.scrollHeight;
       return div;
     }
 
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    // Typing dots shown while the owner is actively composing a reply during a takeover (the
+    // dashboard pings /admin/typing while typing, same throttled pattern as our own /typing
+    // ping to the bot). Separate from `sharedThinking` (the bot-reply indicator) since the two
+    // are never meant to interact — the bot stays silent for the whole time this one is used.
+    let ownerTypingBubble = null;
+    let ownerTypingTimeout = null;
+    function showOwnerTyping() {
+      if (!ownerTypingBubble) {
+        ownerTypingBubble = addMsg("", "bot");
+        ownerTypingBubble.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+      }
+      // No further pings for a few seconds means the owner stopped typing (or went idle)
+      // without sending — hide the indicator rather than leaving it stuck on-screen forever.
+      if (ownerTypingTimeout) clearTimeout(ownerTypingTimeout);
+      ownerTypingTimeout = setTimeout(hideOwnerTyping, 3000);
+    }
+    function hideOwnerTyping() {
+      if (ownerTypingTimeout) { clearTimeout(ownerTypingTimeout); ownerTypingTimeout = null; }
+      if (ownerTypingBubble) { ownerTypingBubble.remove(); ownerTypingBubble = null; }
+    }
+
+    // The backend always pastes this exact link when it offers the consultation, so we can
+    // reliably find it and turn it into an interactive button instead of showing a raw URL.
+    const CALENDLY_URL = "https://calendly.com/a-issa-blnkcs/15min";
+    const CAL_RE = /https?:\/\/calendly\.com\/[^\s]+/i;
+
+    function makeBookButton(dir) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "book-btn";
+      // Match the button label to the reply's direction so it reads naturally in Arabic chats.
+      btn.textContent = dir === "rtl"
+        ? "📅 احجز استشارتك المجانية (١٥ دقيقة)"
+        : "📅 Book your free 15-min consultation";
+      btn.addEventListener("click", () => {
+        // Preferred: open Calendly in an overlay so they never leave the chat. Fallback: new tab.
+        if (window.Calendly && window.Calendly.initPopupWidget) {
+          window.Calendly.initPopupWidget({ url: CALENDLY_URL });
+        } else {
+          window.open(CALENDLY_URL, "_blank", "noopener");
+        }
+      });
+      return btn;
+    }
+
+    // Split into whole sentences the SAME way the backend does (llm.py's _split_sentences) — on
+    // whitespace following sentence-ending punctuation, except right after "BLNK." (the stylized
+    // company name), so its own trailing period never gets misread as ending a sentence. Mirroring
+    // this exactly (rather than reimplementing something looser) avoids the two ever disagreeing.
+    function splitSentences(text) {
+      return (text || "").trim().split(/(?<=[.?؟…])(?<!BLNK\.)\s+/).filter(s => s.trim());
+    }
+
+    // Estimate how long a person would take to type the NEXT sentence, so the pause before it
+    // appears feels proportional to its length instead of a flat random delay — "Hii." lands almost
+    // instantly, a long sentence takes noticeably longer. Deliberately NOT real typing speed (that
+    // would make long sentences take 10+ seconds and feel sluggish) — bounded to stay responsive
+    // while still reading as "typing", not just an arbitrary pause.
+    function estimateTypingDelay(text) {
+      // Lowered again 2026-07-23 (user request — still felt too slow): was MIN_MS 300, MAX_MS 1300,
+      // MS_PER_CHAR 20. (Lowered once before, 2026-07-21, from MAX_MS 2600/MIN_MS 500.)
+      const MIN_MS = 150, MAX_MS = 700, MS_PER_CHAR = 10;
+      return Math.min(MAX_MS, MIN_MS + (text || "").length * MS_PER_CHAR);
+    }
+
+    // Set while a reply is still being revealed sentence-by-sentence so a NEW submission can ask
+    // it to skip its remaining artificial delays — see the submit handler and the note below.
+    let fastForwardReveal = false;
+
+    // A single setTimeout(ms) can't be shortened once scheduled — checking fastForwardReveal only
+    // BEFORE starting the wait (found live, via direct timing measurement) means a flag flip
+    // partway through a long pause has no effect until the NEXT sentence's own wait starts, which
+    // is exactly one sentence too late. Poll in small steps instead, so a flip can interrupt an
+    // ALREADY-running wait almost immediately rather than only being noticed next time.
+    async function waitOrFastForward(ms) {
+      const STEP_MS = 100;
+      let waited = 0;
+      while (waited < ms) {
+        if (fastForwardReveal) return;
+        const step = Math.min(STEP_MS, ms - waited);
+        await new Promise(r => setTimeout(r, step));
+        waited += step;
+      }
+    }
+
+    // Render a bot reply as one bubble PER SENTENCE, appearing in sequence with a short human-like
+    // pause between them, instead of one long paragraph — purely a display change: the exact same
+    // text is shown, just split across consecutive messages, so nothing about the actual reply
+    // content is added, removed, or reworded. If it contains the Calendly link, that's stripped from
+    // whichever sentence held it and the booking button is added as its own message right after,
+    // same as before.
+    async function renderBot(div, text) {
+      fastForwardReveal = false;  // this reply starts with its own normal pacing
+      const sentences = splitSentences(text);
+      const parts = sentences.length > 1 ? sentences : [text];
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const hasLink = CAL_RE.test(part);
+        const display = hasLink
+          ? part.replace(CAL_RE, " ")
+                .replace(/\s+([.,،:])/g, "$1")   // pull punctuation back onto the word
+                .replace(/[\s:.،,]+$/g, "")       // drop dangling colon/period/space left by the link
+                .replace(/\s{2,}/g, " ")
+                .trim()
+          : part;
+        const dir = dirFor(display || part);
+
+        // Reuse the existing (thinking/placeholder) bubble for the FIRST part; every later part
+        // gets its own fresh bubble, so they land as separate consecutive messages.
+        const bubble = i === 0 ? div : addMsg("", "bot");
+
+        // Simulate typing THIS sentence, proportional to its length, before revealing it — applied
+        // uniformly to every sentence including the first. Found live/reported by user (2026-07-21):
+        // the first sentence used to skip this entirely and just pop in the instant the backend
+        // responded (whatever that network/generation latency happened to be, with zero length-based
+        // pacing), while every sentence after it got a proper paced typing delay — an inconsistency
+        // that made only the first bubble feel instant/robotic next to the rest. waitOrFastForward
+        // (not a plain setTimeout) so a new submission mid-reveal can still cut this short.
+        bubble.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+        await waitOrFastForward(estimateTypingDelay(display || part));
+
+        if (display) {
+          bubble.setAttribute("dir", dir);
+          bubble.textContent = display;
+        } else {
+          // Nothing left but the link — drop the empty text bubble entirely.
+          bubble.remove();
+        }
+
+        if (hasLink) {
+          const bookMsg = document.createElement("div");
+          bookMsg.className = "book-msg";
+          bookMsg.appendChild(makeBookButton(dir));
+          log.appendChild(bookMsg);
+          log.scrollTop = log.scrollHeight;
+        }
+      }
+    }
 
     // Tell the server "user is still typing" so a pending reply keeps waiting.
     // Throttled to at most one ping per second while actively typing.
@@ -75,19 +418,54 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId })
       }).catch(() => {});  // best-effort; ignore failures
+
+      // Rescheduling ONLY on submit isn't enough — found live: composing a longer follow-up can
+      // easily take longer than TYPING_INDICATOR_DELAY_MS, so the dots fired before the follow-up
+      // was even sent, appearing wedged between the two user messages. Tie the local indicator to
+      // the SAME "are they still typing" signal already used to extend the backend's own debounce,
+      // so it only ever appears once the user has actually gone quiet, not just "submitted a while
+      // ago". Only matters while we're actually waiting on a reply — no-op otherwise.
+      if (inFlight > 0) scheduleTypingIndicator();
     });
 
-    // Reveal text one character at a time, like a person typing.
-    async function typeInto(div, text) {
-      div.textContent = "";
-      for (const ch of text) {
-        div.textContent += ch;
-        log.scrollTop = log.scrollHeight;
-        // ~45ms per char with slight randomness; longer pause after sentence breaks
-        let delay = 30 + Math.random() * 40;
-        if (".!?،؟\n".includes(ch)) delay += 250;
-        await sleep(delay);
-      }
+    // How long a reply can take before we bother showing the typing dots at all. Lowered
+    // 2026-07-23 (user request — a real reply left a silent, no-feedback gap before the dots
+    // showed up): the "most replies land well under this" assumption behind the old 2000ms value
+    // no longer holds — measured backend latency is now a ~13-16s MEDIAN per turn (the debounce
+    // wait plus understand/retrieval/generation), not a rare slow outlier, so a 2-second silent
+    // gap at the start of nearly every real reply was just dead air with no feedback. Still keeps
+    // enough of a buffer to skip the dots entirely for the genuinely-instant fast-path replies
+    // (e.g. the pure-greeting backend shortcut).
+    const TYPING_INDICATOR_DELAY_MS = 400;
+
+    // Shared across every in-flight /chat request — NOT a per-submission local — so that sending a
+    // follow-up message before the previous reply has landed (the backend's own debounce is what
+    // decides whether they get merged into one burst) never shows two "typing…" dots bubbles at
+    // once. `inFlight` tracks how many requests are still pending, so a `skipped` response only
+    // clears the shared indicator when nothing else is still relying on it.
+    let sharedThinking = null;
+    let inFlight = 0;
+    // ALSO shared, and rescheduled (not just reused) on every new submission — see
+    // scheduleTypingIndicator below for why: a per-submission timer let the dots appear physically
+    // BETWEEN two rapid-fire user messages, which reads like the bot started replying to the first
+    // one alone before the second had even been sent.
+    let typingIndicatorTimer = null;
+
+    function scheduleTypingIndicator() {
+      // Reset the countdown on every new submission, so the indicator only appears after a real
+      // pause in sending — not relative to any single earlier message's own elapsed time. Found
+      // live: send "hii", then take a couple seconds typing a longer follow-up — the dots popped up
+      // mid-composition, positioned right after "hii" and BEFORE the follow-up appeared, looking
+      // like the bot was answering "hii" alone. Real chat apps don't show "typing…" until the other
+      // person has actually gone quiet; this makes that true here too.
+      if (typingIndicatorTimer) clearTimeout(typingIndicatorTimer);
+      typingIndicatorTimer = setTimeout(() => {
+        typingIndicatorTimer = null;
+        if (!sharedThinking) {
+          sharedThinking = addMsg("", "bot");
+          sharedThinking.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+        }
+      }, TYPING_INDICATOR_DELAY_MS);
     }
 
     form.addEventListener("submit", async (e) => {
@@ -95,32 +473,86 @@
       const message = input.value.trim();
       if (!message) return;
 
+      // If an earlier reply is still mid-reveal (its remaining sentences haven't appeared yet),
+      // it's now stale — fast-forward it so it finishes instantly instead of continuing to trickle
+      // in with artificial delays after this new message.
+      fastForwardReveal = true;
+
       addMsg(message, "user");
       input.value = "";
       input.focus();
       // Note: we do NOT disable the Send button — the backend debounces messages,
       // so the user must be free to fire off several in a row within the wait window.
-      const thinking = addMsg("…", "bot");
+
+      // If the typing dots were already showing (from an earlier message in this same burst),
+      // they're now sitting ABOVE the message we just added — appendChild on an element already
+      // in the DOM moves it rather than duplicating it, so this re-parents the existing indicator
+      // to the end of the log, below the new message, instead of leaving it stranded above it.
+      if (sharedThinking) log.appendChild(sharedThinking);
+
+      inFlight++;
+      scheduleTypingIndicator();
 
       try {
         const res = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId, message })
+          body: JSON.stringify({
+            session_id: sessionId, message,
+            company_name: precapCompany || null,
+            industry: precapIndustry || null,
+          })
         });
         if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
+        inFlight--;
 
-        // This message was superseded by a newer one — drop its placeholder bubble.
-        if (data.skipped) {
-          thinking.remove();
+        // This message was superseded by a newer one — the newer request's own reply (or its own
+        // skip) will handle the shared indicator/timer, unless nothing else is left pending at all.
+        // Either the debounce merged this into a later burst (skipped), or a human owner has
+        // taken over this conversation (awaiting_owner) — in both cases there's no bot reply to
+        // show now. An owner's actual reply arrives later over the customer WebSocket instead.
+        if (data.skipped || data.awaiting_owner) {
+          if (inFlight === 0) {
+            if (typingIndicatorTimer) { clearTimeout(typingIndicatorTimer); typingIndicatorTimer = null; }
+            if (sharedThinking) { sharedThinking.remove(); sharedThinking = null; }
+          }
           return;
         }
 
-        // "Type" the answer out like a human instead of dumping it instantly.
-        await typeInto(thinking, data.answer ?? "(no answer)");
+        if (typingIndicatorTimer) { clearTimeout(typingIndicatorTimer); typingIndicatorTimer = null; }
+
+        // Claim whatever indicator is currently showing for this reply (or start a fresh bubble if
+        // the reply beat the delay and no dots were ever shown), one sentence-bubble at a time.
+        // renderBot also turns a pasted Calendly link into a clickable booking button.
+        const bubble = sharedThinking || addMsg("", "bot");
+        sharedThinking = null;
+        const answer = data.answer ?? "(no answer)";
+        await renderBot(bubble, answer);
       } catch (err) {
-        thinking.textContent = "⚠️ Error: " + err.message;
+        inFlight--;
+        if (typingIndicatorTimer) { clearTimeout(typingIndicatorTimer); typingIndicatorTimer = null; }
+        const errMsg = "⚠️ Error: " + err.message;
+        if (sharedThinking) {
+          sharedThinking.textContent = errMsg;
+          sharedThinking = null;
+        } else {
+          addMsg(errMsg, "bot");
+        }
+      }
+    });
+
+    // Calendly fires this postMessage from inside the popup the instant a customer actually
+    // completes a booking (not just opens the widget) — the one reliable signal we have for an
+    // ONLINE meeting, since self-booking happens entirely on Calendly's side. Tell the backend so
+    // it can email BLNK a PDF of this conversation.
+    window.addEventListener("message", (e) => {
+      if (e.data && e.data.event === "calendly.event_scheduled") {
+        fetch("/meeting-booked", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, meeting_type: "online" })
+        }).catch(() => {});  // best-effort; ignore failures
       }
     });
   </script>

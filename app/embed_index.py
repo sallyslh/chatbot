@@ -8,7 +8,10 @@ CHUNKS_PATH = "data/blnk_chunks.jsonl"
 INDEX_PATH = "data/blnk.index"
 META_PATH = "data/blnk_meta.json"
 
-model = SentenceTransformer("BAAI/bge-m3")
+# Load from the local HuggingFace cache only — same as retriever.py. The model is already
+# downloaded, so contacting huggingface.co at startup only invites the SSL/connection failure
+# that was crashing this rebuild.
+model = SentenceTransformer("BAAI/bge-m3", local_files_only=True)
 
 def load_chunks():
     chunks = []

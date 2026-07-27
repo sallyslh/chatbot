@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BLNK · Live Takeover</title>
+  <style>
+    :root {
+      --bg-0:#0a0e1c; --bg-1:#111730;
+      --panel:rgba(20,27,48,.72); --bot:#1b2340; --bot-border:#2b3660;
+      --text:#eaeefb; --muted:#93a1c6;
+      --accent:#6d5efc; --accent-2:#9b6bff;
+      --user-grad:linear-gradient(135deg,#6d5efc,#9b6bff);
+      --ok:#28d17c; --warn:#f0a83c;
+      --radius:16px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height:100%; margin:0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--text);
+      height:100dvh; display:flex; flex-direction:column;
+      background: linear-gradient(180deg, var(--bg-0), var(--bg-1)); background-attachment:fixed;
+    }
+    header {
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      padding:14px 20px; background:var(--panel); backdrop-filter:blur(16px);
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .brand { font-weight:700; font-size:16px; }
+    .brand .dot { color:var(--accent-2); }
+
+    /* ---- Login screen ---- */
+    #login-screen {
+      flex:1; display:flex; align-items:center; justify-content:center;
+    }
+    #login-box {
+      background:var(--panel); border:1px solid var(--bot-border); border-radius:var(--radius);
+      padding:28px; width:280px; display:flex; flex-direction:column; gap:12px;
+    }
+    #login-box input {
+      padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,.1);
+      background:rgba(6,10,22,.7); color:var(--text); font-size:14px;
+    }
+    #login-box button {
+      padding:11px 14px; border:none; border-radius:10px; background:var(--user-grad); color:#fff;
+      font-weight:600; cursor:pointer;
+    }
+    #login-error { color:#ff6b6b; font-size:13px; min-height:16px; }
+
+    /* ---- Dashboard ---- */
+    #dashboard { flex:1; display:none; overflow:hidden; }
+    #dashboard.active { display:flex; }
+    #convo-list {
+      width:300px; overflow-y:auto; border-right:1px solid rgba(255,255,255,.07);
+      background:rgba(255,255,255,.02);
+    }
+    .convo-item {
+      padding:14px 16px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05);
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .convo-item:hover { background:rgba(255,255,255,.04); }
+    .convo-item.selected { background:rgba(109,94,252,.15); }
+    .convo-top { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+    .convo-name { font-weight:600; font-size:14px; }
+    .convo-preview { font-size:12.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .badge {
+      font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; white-space:nowrap;
+    }
+    .badge.bot { background:rgba(40,209,124,.15); color:var(--ok); }
+    .badge.owner { background:rgba(240,168,60,.18); color:var(--warn); }
+
+    #thread-panel { flex:1; display:flex; flex-direction:column; min-width:0; }
+    #thread-header {
+      padding:14px 20px; border-bottom:1px solid rgba(255,255,255,.07);
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+    }
+    #thread-header button {
+      padding:9px 16px; border:none; border-radius:10px; font-weight:600; cursor:pointer; font-size:13px;
+    }
+    #takeover-btn { background:var(--user-grad); color:#fff; }
+    #handback-btn { background:rgba(255,255,255,.08); color:var(--text); }
+    #thread-log { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px; }
+    .tmsg { max-width:70%; padding:10px 14px; border-radius:14px; font-size:14px; line-height:1.5; white-space:pre-wrap; }
+    .tmsg.user { align-self:flex-end; background:var(--user-grad); color:#fff; }
+    .tmsg.bot { align-self:flex-start; background:var(--bot); border:1px solid var(--bot-border); }
+    .tmsg.owner { align-self:flex-start; background:rgba(240,168,60,.18); border:1px solid rgba(240,168,60,.35); }
+    .tmsg .sender-label { display:block; font-size:10.5px; opacity:.65; margin-bottom:3px; }
+    #reply-form { display:flex; gap:10px; padding:14px 18px; border-top:1px solid rgba(255,255,255,.07); }
+    #reply-input {
+      flex:1; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,.1);
+      background:rgba(6,10,22,.7); color:var(--text); font-size:14px;
+    }
+    #reply-input:disabled { opacity:.4; }
+    #reply-form button {
+      padding:11px 20px; border:none; border-radius:10px; background:var(--user-grad); color:#fff;
+      font-weight:600; cursor:pointer;
+    }
+    #reply-form button:disabled { opacity:.4; cursor:not-allowed; }
+    #empty-state { flex:1; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">BLNK<span class="dot">.</span> Live Takeover</div>
+  </header>
+
+  <div id="login-screen">
+    <div id="login-box">
+      <input id="password" type="password" placeholder="Admin password" autofocus />
+      <button id="login-btn">Log in</button>
+      <div id="login-error"></div>
+    </div>
+  </div>
+
+  <div id="dashboard">
+    <div id="convo-list"></div>
+    <div id="thread-panel">
+      <div id="empty-state">Select a conversation</div>
+    </div>
+  </div>
+
+  <script>
+    let conversations = {};       // session_id -> conversation summary (from list_conversations)
+    let selectedId = null;
+    let adminSocket = null;
+
+    function fmtName(c) {
+      return c.customer_name || c.session_id;
+    }
+
+    // --- Notification + sound, fired on a new conversation while this tab is open ---
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+    function notifyNewConversation(sessionId) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("New chat started", { body: sessionId });
+      }
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      } catch (e) { /* best effort — some browsers block audio before any user gesture */ }
+    }
+
+    function notifyKnowledgeGap(sessionId, question) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Bot couldn't answer a question", { body: question || sessionId });
+      }
+      // A lower, longer tone than the new-conversation chime — distinct enough to tell apart by
+      // ear without looking at the screen.
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 440;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.7);
+      } catch (e) { /* best effort — some browsers block audio before any user gesture */ }
+    }
+
+    function renderConvoList() {
+      const list = document.getElementById("convo-list");
+      list.innerHTML = "";
+      const sorted = Object.values(conversations).sort(
+        (a, b) => (b.last_activity_at || "").localeCompare(a.last_activity_at || "")
+      );
+      for (const c of sorted) {
+        const item = document.createElement("div");
+        item.className = "convo-item" + (c.session_id === selectedId ? " selected" : "");
+        item.innerHTML = `
+          <div class="convo-top">
+            <span class="convo-name">${c.needs_attention ? "❓ " : ""}${fmtName(c)}</span>
+            <span class="badge ${c.bot_active ? "bot" : "owner"}">${c.bot_active ? "BOT" : "TAKEN OVER"}</span>
+          </div>
+          <div class="convo-preview">${(c.last_message || "").slice(0, 60)}</div>
+        `;
+        item.addEventListener("click", () => selectConversation(c.session_id));
+        list.appendChild(item);
+      }
+    }
+
+    async function selectConversation(sessionId) {
+      selectedId = sessionId;
+      // Opening the conversation counts as the admin having seen the flagged question.
+      if (conversations[sessionId]) conversations[sessionId].needs_attention = false;
+      renderConvoList();
+      const res = await fetch(`/admin/conversation/${sessionId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      renderThread(data);
+    }
+
+    function renderThread(data) {
+      const panel = document.getElementById("thread-panel");
+      const botActive = data.bot_active;
+      panel.innerHTML = `
+        <div id="thread-header">
+          <strong>${data.session_id}</strong>
+          <div>
+            <button id="takeover-btn" style="display:${botActive ? "inline-block" : "none"}">Take over</button>
+            <button id="handback-btn" style="display:${botActive ? "none" : "inline-block"}">Hand back to bot</button>
+          </div>
+        </div>
+        <div id="thread-log"></div>
+        <form id="reply-form">
+          <input id="reply-input" placeholder="${botActive ? "Take over to reply…" : "Type your reply…"}" ${botActive ? "disabled" : ""} />
+          <button type="submit" ${botActive ? "disabled" : ""}>Send</button>
+        </form>
+      `;
+      const log = document.getElementById("thread-log");
+      for (const m of data.messages) {
+        const cls = m.role === "user" ? "user" : (m.sender === "owner" ? "owner" : "bot");
+        const div = document.createElement("div");
+        div.className = "tmsg " + cls;
+        if (cls === "owner") {
+          div.innerHTML = `<span class="sender-label">You</span>`;
+        }
+        div.appendChild(document.createTextNode(m.content));
+        log.appendChild(div);
+      }
+      log.scrollTop = log.scrollHeight;
+
+      document.getElementById("takeover-btn").addEventListener("click", () => setTakeover(true));
+      document.getElementById("handback-btn").addEventListener("click", () => setTakeover(false));
+      if (!botActive) {
+        document.getElementById("reply-input").addEventListener("input", () => pingTyping(data.session_id));
+      }
+      document.getElementById("reply-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const input = document.getElementById("reply-input");
+        const message = input.value.trim();
+        if (!message) return;
+        input.value = "";
+        await fetch("/admin/reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: data.session_id, message }),
+        });
+      });
+    }
+
+    // Throttled to at most one ping per second while actively typing, same pattern as the
+    // customer widget's own /typing ping to the bot.
+    let lastTypingPing = 0;
+    function pingTyping(sessionId) {
+      const now = Date.now();
+      if (now - lastTypingPing < 1000) return;
+      lastTypingPing = now;
+      fetch("/admin/typing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      }).catch(() => {});
+    }
+
+    async function setTakeover(active) {
+      await fetch(active ? "/admin/takeover" : "/admin/handback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: selectedId }),
+      });
+    }
+
+    function appendLiveMessage(sessionId, sender, content) {
+      if (sessionId !== selectedId) return;
+      const log = document.getElementById("thread-log");
+      if (!log) return;
+      const cls = sender === "user" ? "user" : (sender === "owner" ? "owner" : "bot");
+      const div = document.createElement("div");
+      div.className = "tmsg " + cls;
+      if (cls === "owner") div.innerHTML = `<span class="sender-label">You</span>`;
+      div.appendChild(document.createTextNode(content));
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function connectAdminSocket() {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${proto}//${location.host}/ws/admin`);
+      ws.onopen = () => showDashboard();
+      ws.onclose = () => {
+        // Either logged out / cookie invalid, or a drop — show login and let the user retry.
+        showLogin();
+      };
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "init") {
+          conversations = {};
+          for (const c of data.conversations) conversations[c.session_id] = c;
+          renderConvoList();
+        } else if (data.type === "new_conversation") {
+          notifyNewConversation(data.session_id);
+          if (!conversations[data.session_id]) {
+            conversations[data.session_id] = { session_id: data.session_id, bot_active: true, last_activity_at: new Date().toISOString() };
+          }
+          renderConvoList();
+        } else if (data.type === "new_message") {
+          const c = conversations[data.session_id];
+          if (c) {
+            c.last_message = data.content;
+            c.last_activity_at = new Date().toISOString();
+          }
+          renderConvoList();
+          appendLiveMessage(data.session_id, data.sender, data.content);
+        } else if (data.type === "takeover_changed") {
+          const c = conversations[data.session_id];
+          if (c) c.bot_active = data.bot_active;
+          renderConvoList();
+          if (data.session_id === selectedId) selectConversation(selectedId);
+        } else if (data.type === "knowledge_gap") {
+          // The bot couldn't answer something (see main.py's is_knowledge_gap) — flag it in the
+          // list so it's visible at a glance, on top of the email alert already sent. Cleared once
+          // the admin actually opens the conversation (see selectConversation below).
+          notifyKnowledgeGap(data.session_id, data.question);
+          if (!conversations[data.session_id]) {
+            conversations[data.session_id] = { session_id: data.session_id, bot_active: true, last_activity_at: new Date().toISOString() };
+          }
+          conversations[data.session_id].needs_attention = true;
+          renderConvoList();
+        }
+      };
+      adminSocket = ws;
+    }
+
+    function showDashboard() {
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("dashboard").classList.add("active");
+    }
+    function showLogin() {
+      document.getElementById("dashboard").classList.remove("active");
+      document.getElementById("login-screen").style.display = "flex";
+    }
+
+    document.getElementById("login-btn").addEventListener("click", async () => {
+      const password = document.getElementById("password").value;
+      const res = await fetch("/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        document.getElementById("login-error").textContent = "";
+        connectAdminSocket();
+      } else {
+        document.getElementById("login-error").textContent = "Wrong password.";
+      }
+    });
+    document.getElementById("password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("login-btn").click();
+    });
+
+    // Try connecting immediately in case a valid session cookie already exists.
+    connectAdminSocket();
+  </script>
+</body>
+</html>
