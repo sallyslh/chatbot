@@ -3481,8 +3481,18 @@ def generate_answer(user_message: str, context_chunks: list, chat_history: list,
     # goodbye got answered with "Pricing and timing specifics are always discussed during the meeting"
     # instead of any kind of closing acknowledgment. A closing is never a continuation of the pricing
     # thread, however the turn right before it was framed.
+    # Also exempted (2026-07-28) on a fresh field-pitch ask (signals["wants_field_pitch"]) — same
+    # exemption already applied to the pending-call-reply override further below, for the identical
+    # reason. Found live: "yes but how can u help with my restaurant" right after our scope-dependency
+    # pricing line got pricing force-set True here, which — since field_pitch still won as primary but
+    # pricing was left in the dropped-asks set — triggered the SECONDARY_ASK_BUILDERS "pricing" compound
+    # note and appended "Pricing and timing specifics are always discussed during the meeting" to a
+    # reply that was purely a field-pitch ask, nobody having asked about pricing this turn at all. A
+    # first-time field reveal/pitch request is substantive new content, not a continuation of the
+    # pricing thread, however the turn right before it was framed.
     if (not pricing and last_assistant_gave_scope_dependency(chat_history)
-            and not is_gratitude_closing(user_message) and not is_vague_reaction(user_message)):
+            and not is_gratitude_closing(user_message) and not is_vague_reaction(user_message)
+            and not bool(signals.get("wants_field_pitch"))):
         pricing = True
     # Deterministic override, same failure class as the wants_contact-vs-more_detail one above:
     # found live — "who is the owner" got is_pricing=true from the LLM again, hijacking the turn
