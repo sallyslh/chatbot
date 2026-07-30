@@ -38,7 +38,10 @@ SMALL_TALK: a greeting, thanks, pleasantry, or casual/emotional remark with no r
 Reply warmly and briefly, one human to another. Don't force in company info nobody asked for. Greeting
 back is ONLY ever done once, on the very first message of the whole conversation, fused with a comma
 as a leading clause onto the rest of that one reply. On every later message, never greet again, even
-if they say "hi" again.
+if they say "hi" again. If they greet with "صباح الخير", reply with "صباح الخير" back, plain, not a
+creative variant like "صباح الفل" or "صباح النور". Same for "مساء الخير", reply with "مساء الخير". A brief acknowledgment like "cool" or "ok" after you've just answered something
+gets a brief warm reply and nothing else, do NOT follow it with an offer to explain more or a menu of
+what else you could cover, same no-menu rule as everywhere else in this prompt.
 
 OFF_TOPIC: has nothing to do with BLNK, its services, or branding/design work (general knowledge,
 medical/legal/drug questions, coding help, homework, unrelated requests, etc.), regardless of whether
@@ -48,10 +51,15 @@ brand or project though." Never actually answer the unrelated question, and neve
 with the team or follow up. That promise is reserved for real BLNK questions we don't have on file.
 
 MEETING_RELEVANT (price, cost, budget, timeline/duration, or scheduling/moving forward): don't raise
-it unless asked. When asked, never give a number or range, and never ask the customer for more project
-scope or details in order to work toward one. You cannot quote a price no matter how much detail they
-give you, so don't fish for it. The FIRST time it comes up, say plainly that it depends on the
-project's scope and specifics, and that gets settled in the meeting, then offer the meeting itself
+it unless asked. Timing counts here even when it's not phrased as a question — a customer sharing
+their own deadline or timing constraint ("timeline is tight, board meeting in 6 weeks", "we need this
+before Ramadan") is still raising timing as a topic, treat it the same as "how long will this take"
+rather than answering it as a process question. When asked, never give a number or range, never a
+compressed/expedited plan, phase breakdown, or workflow description either, and never ask the customer
+for more project scope or details in order to work toward one. You cannot quote a price or a timeline
+no matter how much detail they give you, so don't fish for it. The FIRST time it comes up, say plainly
+that it depends on the project's scope and specifics, and that gets settled in the meeting, then offer
+the meeting itself
 (see MEETING FLOW below). If they ask again later, even with new context like a budget number, don't
 repeat that same explanation word for word. See the repeat rule in MEETING FLOW.
 
@@ -99,10 +107,11 @@ facts. Decide for yourself which of these applies, using ONLY the retrieved cont
     flatly say "I don't have that information" and stop. Say briefly and warmly that you'll check
     and follow up (a teammate is genuinely notified behind the scenes, so it's a real promise, not a
     brush-off). Never describe HOW you know or don't know something — no "materials I have on
-    file", "the information I have access to", "what's in my system", "the context I can see", or
-    any variant. That's how a bot talks about its own database, not how a real team member talks. A
-    real person just says they're not sure and will check, full stop, nothing about where their
-    knowledge comes from.
+    file", "the information I have access to", "what's in my system", "the context I can see", "the
+    materials retrieved", "the retrieved materials", or any variant, including describing a
+    retrieval/lookup step in the third person. That's how a bot talks about its own database, not
+    how a real team member talks. A real person just says they're not sure and will check, full
+    stop, nothing about where their knowledge comes from.
 
 MEETING FLOW: offer a meeting whenever the customer asks about price/timing, asks how to move forward
 or get in touch, or has clearly shown real interest such that a next step genuinely helps them. Phrase
@@ -161,7 +170,10 @@ answer from the retrieved context and END there — do not tack on a clarifying 
 down which variant/goal/type they meant ("is this for tourists or locals?", "promotional or
 informational?"), even if the honest answer would technically differ by case. Cover the general
 case, or briefly mention the couple of ways it could go, but don't make them answer a question just
-to get the information they already asked for. The ONLY questions you're ever allowed to end a reply
+to get the information they already asked for. Also never offer a menu of extra subtopics to go
+deeper on ("I can explain X in more detail, or talk about Y instead, which would you prefer") — if
+there's a genuinely most useful next detail, just say it plainly; otherwise stop, don't dangle more
+optional ground you could cover. The ONLY questions you're ever allowed to end a reply
 with are the two already covered elsewhere in this prompt: their field/industry when a tailored
 pitch genuinely needs it and doesn't have it yet, and which day/time works once a meeting mode is
 picked. Every other reply ends on a statement, not a question mark."""
@@ -313,6 +325,13 @@ def _daytime_already_settled(chat_history: list) -> bool:
 # character with no time meaning at all, and got read as if they were a clock time. A digit only
 # counts here when it's not glued to a letter on either side (a standalone token like "at 4"), or
 # when it's followed by am/pm even with no space ("3pm"), or in an explicit hh:mm format.
+#
+# Requiring "at"/"الساعة"/"ساعة" immediately before a standalone digit, found live: even un-glued,
+# a bare 1-2 digit number alone is just as often a quantity, not a time — "we're a team of 8
+# people" and "launching in 6 months" both got read as a given meeting time and triggered a
+# fabricated "you already gave a day/time" confirmation, address and all, with no meeting ever
+# discussed. A standalone digit is only real time evidence when something actually marks it as a
+# clock reference, not merely a lone number sitting near other words.
 # Found live: "الساعة اتنعش الظهر" (twelve o'clock noon) went unrecognized because "اتنعش" is yet
 # another spelling of "twelve" not covered by the "اثنعش"/"تنعش" variants already here — Lebanese
 # colloquial numbers have many spelling variants with no single canonical form. Worse, the miss
@@ -326,12 +345,27 @@ _AR_HOUR_WORD = (
 
 _TIME_HINT_RE = re.compile(
     r"\d{1,2}\s*(am|pm)\b|\d{1,2}:\d{2}|"
-    r"(?<![A-Za-z؀-ۿ])\d{1,2}(?![A-Za-z0-9؀-ۿ])|"
-    r"morning|afternoon|evening|noon|"
+    r"\b(?:at|الساعة|ساعة)\s*\d{1,2}(?![A-Za-z0-9؀-ۿ])|"
+    # Negative lookbehind excludes "good morning"/"good afternoon"/"good evening" as a plain
+    # greeting salutation, found live: "Good afternoon" on the very first message of a brand new
+    # conversation, no meeting ever discussed, still matched the bare day-part word and triggered a
+    # fabricated "I will check the schedule and get back to you" reply. A real given time-of-day
+    # ("we can meet tomorrow afternoon") isn't preceded by "good ", so this doesn't affect it.
+    # "noon" needs its own word boundary too, found live: it's a literal substring of "afternoon"
+    # ("after-NOON"), so even with the lookbehind above excluding "afternoon" itself, the separate
+    # bare "noon" alternative still matched inside it and let the false trigger through anyway.
+    r"(?<!good )morning|(?<!good )afternoon|(?<!good )evening|\bnoon\b|"
     # Both the formal and colloquial Lebanese spellings, found live: "الصبح" (colloquial) doesn't
     # contain "صباح" (formal) as a substring, they're different words for the same day-part, not
     # a spelling variant of each other — same gap class as "عصر" (afternoon) being missing entirely.
-    r"صباح|صبح|مساء|مسا|ظهر|عصر|"
+    # Same greeting exclusion as the English day-parts above, mirrored as a lookahead instead of a
+    # lookbehind since Arabic puts the greeting word AFTER the day-part: "صباح الخير"/"مساء الخير"
+    # (good morning/evening) and the reply "صباح النور" are everyday greetings, not a given time.
+    # "مسا" needs the same "ء?" allowance in its own lookahead, found live: it's a literal prefix of
+    # "مساء" (missing only the trailing hamza), so it still matched inside "مساء الخير" through the
+    # separate colloquial alternative even after "مساء" itself was excluded — same class of gap as
+    # "noon" matching inside "afternoon" above.
+    r"صباح(?!\s*(الخير|النور))|صبح|مساء(?!\s*الخير)|مسا(?!ء?\s*الخير)|ظهر|عصر|"
     # Spelled-out Arabic hour words, found live: "الاتنين الساعة وحدة بعد الضهر" (Monday, one
     # o'clock, afternoon) gave a real time that went completely unrecognized, since only digits and
     # day-part words were covered, not number words. Deliberately excludes اتنين/تنين (two) — that's
@@ -513,8 +547,14 @@ def _strip_dashes(text: str) -> str:
 # mole against an open-ended set of ways to phrase the same tell. Matching "materials" near ANY
 # self-referential verb within a short span, instead of enumerating exact phrases, closes the
 # pattern generally instead of chasing each new wording one at a time.
+# Found live: a FOURTH variant, "the materials retrieved"/"the retrieved materials", still slipped
+# through — "retrieved" isn't a first-person verb like "I have"/"I can", it's the model describing
+# its OWN retrieval step in the third person, a different grammatical shape than the ones already
+# covered, not just a new synonym for one of them. Needs its own alternative, order-independent
+# (adjective-before-noun and noun-before-verb both occurred live).
 _BOT_EXPOSING_RE = re.compile(
-    r"materials\b[^.?!]{0,20}\b(i have|i can|here|on file|available|access)|"
+    r"materials\b[^.?!]{0,20}\b(i have|i can|here|on file|available|access|retrieved)|"
+    r"\bretrieved\b[^.?!]{0,20}\b(materials|information|context|data)|"
     r"(the )?(information|context)\b[^.?!]{0,15}\bi (have|can see|can access)|"
     r"what'?s in my (system|database)|(the )?(data|documents)\b[^.?!]{0,15}\bi (have|can access)|"
     r"في المعلومات (يلي|اللي) عندي|بالمعلومات (يلي|اللي) عندي",
@@ -648,20 +688,24 @@ def generate_answer(user_message: str, context_chunks: list, chat_history: list,
             "supports the specific point you're making with it — never attach a real name to a "
             "claim its own context doesn't back up. Fewer, true points beat more, invented ones. "
             "Only mention the meeting at the very end, after actually giving them substance, don't "
-            "lead with it or rush to it before you've said anything convincing."
+            "lead with it or rush to it before you've said anything convincing. End on that "
+            "substance, do not close by asking which one they'd like to focus on or prioritize."
         )})
     elif signals.get("wants_field_pitch") and chat_history:
         # Found live: this signal fired again on a FOLLOW-UP turn ("شو رح تعملولي بالتحديد؟", what
         # exactly will you do for me) after the fuller pitch above had already been given once —
         # with no awareness of that, the model just gave nearly the same pitch again, reworded,
         # directly violating the "never repeat, even reworded" rule elsewhere in this prompt.
+        # The third option here used to be "or ask a clarifying question to find out which service
+        # matters most" — found live, that authorized exactly the closing-question pattern the main
+        # prompt's no-menu-of-subtopics rule bans, and the model took the opening every time.
         messages.append({"role": "system", "content": (
             "The customer is asking again about what you can offer their business. A fuller pitch "
             "was likely already given earlier in this conversation — do NOT repeat the same points "
             "reworded, that is exactly the repetition you must never do. Instead, either go deeper "
-            "on one specific thing you haven't detailed yet, answer whatever is actually NEW in "
-            "their latest question, or ask a clarifying question to find out which service matters "
-            "most to them."
+            "on one specific thing you haven't detailed yet, or answer whatever is actually NEW in "
+            "their latest question. Pick the one that seems most useful and state it directly, do "
+            "not ask them which service matters most or end with a question."
         )})
 
     if _ASKS_OWNER_RE.search(user_message or ""):
@@ -706,20 +750,25 @@ def generate_answer(user_message: str, context_chunks: list, chat_history: list,
             "framing here at all, that framing is for a different question than this one."
         )})
 
-    if _meeting_ever_offered(chat_history):
+    # Found live: this fired on EVERY turn once the meeting had been offered once, no matter what
+    # that turn was actually about ("tell me more about the process", "how many people are on your
+    # team") — the directive already said "never appended to a reply that wasn't actually about the
+    # meeting at all", but the model kept tacking the passive mention on regardless, reading the
+    # rest of the directive as license to mention it anywhere. Gating on category_hint too, so this
+    # only fires on a turn that's actually price/timing/moving-forward, removes the temptation
+    # instead of just telling the model not to act on it.
+    if _meeting_ever_offered(chat_history) and category_hint == "meeting_relevant":
         messages.append({"role": "system", "content": (
             "The onsite-vs-online meeting choice has already been explained earlier in this "
-            "conversation. Do NOT re-explain what each option IS again. If they're asking about "
-            "price or timing again, briefly acknowledge, in different words than any earlier reply, "
-            "that it's exactly what the meeting covers, without re-explaining onsite/online. If no "
-            "mode has been picked yet, do NOT give the booking link or the office address, you "
-            "don't know which one they want yet. Do NOT phrase it as an active question every time "
-            "either ('which would you prefer, onsite or online?') — asking that again on every "
-            "reply reads as repetitive and pushy, even in different words. Instead mention it "
-            "briefly and passively, in different phrasing each time, e.g. 'whenever you're ready "
-            "you can go ahead with a meeting, onsite or online, just let me know' — a mention, not "
-            "a question demanding an immediate answer, and never appended to a reply that wasn't "
-            "actually about the meeting at all."
+            "conversation. Do NOT re-explain what each option IS again. Briefly acknowledge, in "
+            "different words than any earlier reply, that it's exactly what the meeting covers, "
+            "without re-explaining onsite/online. If no mode has been picked yet, do NOT give the "
+            "booking link or the office address, you don't know which one they want yet. Do NOT "
+            "phrase it as an active question every time either ('which would you prefer, onsite or "
+            "online?') — asking that again on every reply reads as repetitive and pushy, even in "
+            "different words. Instead mention it briefly and passively, in different phrasing each "
+            "time, e.g. 'whenever you're ready you can go ahead with a meeting, onsite or online, "
+            "just let me know' — a mention, not a question demanding an immediate answer."
         )})
 
     # The onsite-flow moments found live to be unreliable on the model's own judgment alone (same
@@ -773,14 +822,23 @@ def generate_answer(user_message: str, context_chunks: list, chat_history: list,
             "Do NOT ask them to pick online instead, and do NOT ask for the day/time "
             "again, they already gave it."
         )})
-    elif _picks_onsite(user_message) and not _ONLINE_PICK_RE.search(user_message or ""):
+    # Both branches below gated on _meeting_ever_offered too, found live: "we sell shoes online, 15
+    # employees" (a plain business fact, on only the customer's SECOND message ever, no meeting
+    # discussed yet at all) matched bare "online" and got a reply that was ONLY the raw booking
+    # link, ignoring the actual message entirely. "onsite" wording (Beirut, office, in Lebanon) has
+    # the same risk for the same reason. A word like "online" or "Beirut" only means the customer is
+    # ANSWERING the onsite-vs-online choice once that choice has actually been put to them, not the
+    # first time either word appears in the conversation for an unrelated reason.
+    elif (_picks_onsite(user_message) and not _ONLINE_PICK_RE.search(user_message or "")
+          and _meeting_ever_offered(chat_history)):
         messages.append({"role": "system", "content": (
             "The customer just chose the onsite meeting. In this SAME reply, give the office "
             f"address exactly as written here, with no changes: {OFFICE_ADDRESS}. Also ask which "
             "day and time works for them. Do not defer the address to a later reply, give it now. "
             "Do not mention the online option, they already chose onsite."
         )})
-    elif _ONLINE_PICK_RE.search(user_message or "") and not _picks_onsite(user_message):
+    elif (_ONLINE_PICK_RE.search(user_message or "") and not _picks_onsite(user_message)
+          and _meeting_ever_offered(chat_history)):
         # Found live: "we're in Dubai so online works" (an explicit, unambiguous online pick) got
         # an entire second field pitch re-explaining the services, ending with "would you like the
         # link?" instead of just giving it — no directive existed for this moment at all, only the

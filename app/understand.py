@@ -23,9 +23,17 @@ JSON object about the LATEST user message. No markdown, no prose, just the JSON.
   Arabic message does NOT make it English.
 - is_pricing: true if the latest message asks about price, cost, budget, fees, or how much
   something costs — in ANY language or spelling (e.g. "how much", "se3r", "addesh", "taklofe",
-  "l asaar", "بكم") — OR asks about project timing/duration (e.g. "how long does it take",
-  "adde badda wa2et", "turnaround time", "kam yom"). Both get treated identically downstream, so
-  either kind of question sets this field true. Else false.
+  "l asaar", "بكم") — OR is about project timing/duration/schedule in ANY form, not just a total
+  turnaround number and not just a direct QUESTION either: "how long does it take", "adde badda
+  wa2et", "turnaround time", "kam yom" are direct questions, but a STATEMENT that shares a deadline
+  or timing constraint is the same underlying topic and counts too ("timeline is tight, board
+  meeting in 6 weeks", "we need this before Ramadan", "our launch is in 2 months") — the customer
+  is still surfacing timing as something they need addressed, even while phrasing it as their own
+  constraint rather than a question aimed at BLNK. Also covers a question about what happens during
+  a specific stretch of the project ("what would the first month look like", "what happens in week
+  one", "what's the timeline broken into phases"). Any mention of timing, whether a question, a
+  schedule breakdown, or the customer's own deadline, is the same topic — set this field true for
+  all of it. Else false.
 - asks_if_meeting_costs: true if the customer is specifically asking whether the MEETING, CALL,
   CONSULTATION, or VISIT itself costs money or requires payment (e.g. "do I have to pay to visit
   you", "lezim edfa3 la2eno ejtme3", "is the consultation free", "fi dafe3 lal meeting", "shu bekalef
@@ -135,6 +143,12 @@ JSON object about the LATEST user message. No markdown, no prose, just the JSON.
   language ability (e.g. "I don't speak English well" is NOT this — that's unaddressed_intent) and
   not just a message that happens to be written in that language. Only set this when the request is
   explicit and specifically about the reply language. Else null.
+- is_playful_hypothetical: true if the LATEST message is a playful, non-literal "what if"/hypothetical
+  question that's design- or creative-adjacent but is NOT a real question about BLNK's actual current
+  work or services (e.g. "what would a logo for a time traveler look like", "if a boxer designed their
+  own logo blindfolded what would happen", "what's your favorite cuisine, hypothetically"). This is
+  about tone, not topic: the customer is playing around, not asking BLNK to describe real deliverables
+  or actually do the work. Else false.
 - message_category: classify the LATEST message into EXACTLY ONE of these four buckets — this drives
   which handling path the backend takes, so pick carefully:
   * "small_talk" — a greeting, thanks, pleasantry, or casual/emotional remark with no real question
@@ -145,7 +159,12 @@ JSON object about the LATEST user message. No markdown, no prose, just the JSON.
     doesn't belong in a creative agency's business chatbot. When in doubt, do NOT pick this — only
     use it when the message is clearly and entirely unrelated to BLNK's business.
   * "meeting_relevant" — asks about price, cost, budget, or timeline/duration, or is otherwise about
-    scheduling, moving forward, or the consultation/meeting itself.
+    scheduling, moving forward, or the consultation/meeting itself. Same broadened timing test as
+    is_pricing above: a question about what happens during a stretch of the project ("what would
+    the first month look like") is a timeline question too, not an on_topic process question, even
+    with no duration number or "how long" wording in it. Also covers a STATEMENT sharing a deadline
+    or timing constraint, not just a direct question ("timeline is tight, board meeting in 6
+    weeks") — that's the customer raising timing as a topic, route it here rather than on_topic.
   * "on_topic" — any other genuine question that IS about BLNK, its services, portfolio, team,
     process, or company facts — whether or not you personally know if we have the answer on file.
     This is the default for any real business question that isn't specifically about price/timing.
